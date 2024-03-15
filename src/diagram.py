@@ -14,9 +14,6 @@ with Diagram(name="TeXHub Architecture", show=False):
     openresty = Nginx("OpenResty")
     ingress = Nginx("ingress")
 
-    metrics = Prometheus("metric")
-    metrics << Edge(color="firebrick", style="dashed") << Grafana("monitoring")
-
     with Cluster("Service Cluster"):
         grpcsvc = [
             Server("texhub-service")
@@ -24,17 +21,23 @@ with Diagram(name="TeXHub Architecture", show=False):
 
     with Cluster("Cache HA"):
         primary = Redis("session")
-        primary - Edge(color="brown", style="dashed") - Redis("replica") << Edge(label="collect") << metrics
+        primary - Edge(color="brown", style="dashed") - Redis("replica") << Edge(label="collect") 
         grpcsvc >> Edge(color="brown") >> primary
 
     with Cluster("Database HA"):
         primary = PostgreSQL("users")
-        primary - Edge(color="brown", style="dotted") - PostgreSQL("replica") << Edge(label="collect") << metrics
+        primary - Edge(color="brown", style="dotted") - PostgreSQL("replica") << Edge(label="collect")
         grpcsvc >> Edge(color="black") >> primary
+    
+    with Cluster("Logging Center"):
+        aggregator = Fluentd("logging")
+        aggregator >> Edge(label="parse") >> Kafka("stream") >> Edge(color="black", style="bold") >> Spark("analytics")
+    
+    with Cluster("Monitoring Center"):
+        metrics = Prometheus("metric")
+        metrics << Edge(color="firebrick", style="dashed") << Grafana("monitoring")
 
-    aggregator = Fluentd("logging")
-    aggregator >> Edge(label="parse") >> Kafka("stream") >> Edge(color="black", style="bold") >> Spark("analytics")
-
+    grpcsvc >> metrics
     ingress >> Edge(color="darkgreen") << grpcsvc >> Edge(color="darkorange") >> aggregator
-    openresty >> ingress
-    users >> openresty 
+    openresty >> Edge(color="darkgreen") <<ingress
+    users >> Edge(color="darkgreen") << openresty 
